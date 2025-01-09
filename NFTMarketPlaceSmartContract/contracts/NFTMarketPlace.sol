@@ -2,11 +2,11 @@
 pragma solidity ^0.8.28;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import {Counters} from "./Counters.sol";
 import {console} from "hardhat/console.sol";
 
-contract NFTMarketPlace is ERC721Enumerable {
+contract NFTMarketPlace is ERC721URIStorage {
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIds;
@@ -62,7 +62,7 @@ contract NFTMarketPlace is ERC721Enumerable {
         uint256 newTokenId = _tokenIds.current();
 
         _mint(msg.sender, newTokenId);
-        // _setTokenURI(newTokenId, tokenURI);
+        _setTokenURI(newTokenId, tokenURI);
 
         createMarkerItem(newTokenId, price);
 
