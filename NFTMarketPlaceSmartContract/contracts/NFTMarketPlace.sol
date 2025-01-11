@@ -64,12 +64,15 @@ contract NFTMarketPlace is ERC721URIStorage {
         _mint(msg.sender, newTokenId);
         _setTokenURI(newTokenId, tokenURI);
 
-        createMarkerItem(newTokenId, price);
+        createMarketItem(newTokenId, price);
 
         return newTokenId;
     }
 
-    function createMarkerItem(uint tokenId, uint price) public {
+    function createMarketItem(uint tokenId, uint price) private {
+        require(price > 0, "Price must be greater than zero");
+        require(msg.value == listingPrice, "Listing fee required");
+
         MarketItem memory newMarketItem = MarketItem(
             tokenId,
             payable(msg.sender),
@@ -89,5 +92,105 @@ contract NFTMarketPlace is ERC721URIStorage {
             price,
             false
         );
+    }
+
+    // Function to resell an NFT
+    function reSellNFT(uint256 tokenId, uint256 price) public payable {
+        require(
+            idMarketItem[tokenId].owner == msg.sender,
+            "Only item owner can resell"
+        );
+        require(msg.value == listingPrice, "Listing fee required");
+
+        idMarketItem[tokenId].price = price;
+        idMarketItem[tokenId].sold = false;
+        idMarketItem[tokenId].seller = payable(msg.sender);
+        idMarketItem[tokenId].owner = payable(address(0));
+
+        _itemsSold.decrement();
+
+        _transfer(msg.sender, address(this), tokenId); // Transfer ownership to contract
+    }
+
+    function createMarketSale(uint tokenId) public payable {
+        MarketItem storage item = idMarketItem[tokenId];
+        require(
+            msg.value == item.price,
+            "Please submit the asking price to complete the purchase"
+        );
+        require(!item.sold, "This item is already sold");
+
+        item.owner = payable(msg.sender);
+        item.sold = true;
+        _itemsSold.increment();
+
+        _transfer(address(this), msg.sender, tokenId); // Transfer ownership to buyer
+        payable(item.seller).transfer(msg.value); // Pay the seller
+        owner.transfer(listingPrice); // Transfer listing fee to the marketplace owner
+    }
+
+    function fetchMarketItems() public view returns (MarketItem[] memory) {
+        uint256 itemCount = _tokenIds.current();
+        uint256 unsoldItemCount = itemCount - _itemsSold.current();
+        uint256 currentIndex = 0;
+
+        MarketItem[] memory items = new MarketItem[](unsoldItemCount);
+        for (uint256 i = 0; i < itemCount; i++) {
+            if (idMarketItem[i + 1].owner == address(0)) {
+                uint256 currentId = i + 1;
+                MarketItem storage currentItem = idMarketItem[currentId];
+                items[currentIndex] = currentItem;
+                currentIndex += 1;
+            }
+        }
+        return items;
+    }
+
+    // Function to fetch items owned by a user
+    function fetchMyNFTs() public view returns (MarketItem[] memory) {
+        uint256 totalItemCount = _tokenIds.current();
+        uint256 itemCount = 0;
+        uint256 currentIndex = 0;
+
+        for (uint256 i = 0; i < totalItemCount; i++) {
+            if (idMarketItem[i + 1].owner == msg.sender) {
+                itemCount += 1;
+            }
+        }
+
+        MarketItem[] memory items = new MarketItem[](itemCount);
+        for (uint256 i = 0; i < totalItemCount; i++) {
+            if (idMarketItem[i + 1].owner == msg.sender) {
+                uint256 currentId = i + 1;
+                MarketItem storage currentItem = idMarketItem[currentId];
+                items[currentIndex] = currentItem;
+                currentIndex += 1;
+            }
+        }
+        return items;
+    }
+
+    // Function to fetch items created by a user
+    function fetchItemsListed() public view returns (MarketItem[] memory) {
+        uint256 totalItemCount = _tokenIds.current();
+        uint256 itemCount = 0;
+        uint256 currentIndex = 0;
+
+        for (uint256 i = 0; i < totalItemCount; i++) {
+            if (idMarketItem[i + 1].seller == msg.sender) {
+                itemCount += 1;
+            }
+        }
+
+        MarketItem[] memory items = new MarketItem[](itemCount);
+        for (uint256 i = 0; i < totalItemCount; i++) {
+            if (idMarketItem[i + 1].seller == msg.sender) {
+                uint256 currentId = i + 1;
+                MarketItem storage currentItem = idMarketItem[currentId];
+                items[currentIndex] = currentItem;
+                currentIndex += 1;
+            }
+        }
+        return items;
     }
 }
